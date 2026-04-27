@@ -988,23 +988,8 @@
 
   function formatFechaConHora(dateStr) {
     if (!dateStr) return '';
-    const clean = dateStr.trim();
-    if (!clean) return '';
-    const parts = clean.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
-    if (!parts) {
-      const d = clean.match(/^(\d{4})-(\d{2})-(\d{2})/);
-      return d ? `${d[3]}/${d[2]}/${d[1].slice(-2)}` : clean;
-    }
-    let [,yyyy,mm,dd,hh,min] = parts;
-    // NocoDB guarda siempre en UTC → sumar 2h para España (CEST UTC+2)
-    let totalMin = parseInt(hh)*60 + parseInt(min) + 120;
-    if (totalMin >= 1440) totalMin -= 1440;
-    hh = String(Math.floor(totalMin/60)).padStart(2,'0');
-    min = String(totalMin%60).padStart(2,'0');
-    const yy = yyyy.slice(-2);
-    return (hh === '00' && min === '00')
-      ? `${dd}/${mm}/${yy}`
-      : `${dd}/${mm}/${yy} ${hh}:${min}h`;
+    const d = dateStr.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return d ? `${d[3]}/${d[2]}/${d[1].slice(-2)}` : dateStr;
   }
 
   // ---- RENDER ----
