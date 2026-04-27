@@ -1668,11 +1668,10 @@
     if (proximas.length === 0) return;
 
     const lista = proximas.map(l => {
-      const parts = l.fechaCita.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/);
-      const [,yy,mm,dd,hh='00',min='00'] = parts;
+      const parts = l.fechaCita.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      const [,yy,mm,dd] = parts;
       const esHoy = dd === String(hoy.getDate()).padStart(2,'0') && mm === String(hoy.getMonth()+1).padStart(2,'0');
-      const hora = hh === '00' && min === '00' ? '' : ` ${hh}:${min}h`;
-      const cuando = esHoy ? `<strong style="color:#DC2626;">HOY${hora}</strong>` : `${dd}/${mm}${hora}`;
+      const cuando = esHoy ? `<strong style="color:#DC2626;">HOY</strong>` : `${dd}/${mm}`;
       return `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid #C7D2FE;font-size:0.82rem;">
         <span>👤 <strong>${l.nombre}</strong> · ${l.ciclo || ''}</span>
         <span style="color:#3730A3;font-weight:600;">${cuando}</span>
