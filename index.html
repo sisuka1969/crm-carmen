@@ -988,13 +988,20 @@
 
   function formatFechaConHora(dateStr) {
     if (!dateStr) return '';
-    const clean = dateStr.trim().replace('+00:00','').replace('Z','').trim();
+    const clean = dateStr.trim();
     if (!clean) return '';
-    // Parsear manualmente para evitar problemas de zona horaria
-    const parts = clean.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/);
-    if (!parts) return dateStr;
-    const [,yFull,mm,dd,hh='00',min='00'] = parts;
-    const yy = yFull.slice(-2);
+    const parts = clean.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+    if (!parts) {
+      const d = clean.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      return d ? `${d[3]}/${d[2]}/${d[1].slice(-2)}` : clean;
+    }
+    let [,yyyy,mm,dd,hh,min] = parts;
+    // NocoDB guarda siempre en UTC → sumar 2h para España (CEST UTC+2)
+    let totalMin = parseInt(hh)*60 + parseInt(min) + 120;
+    if (totalMin >= 1440) totalMin -= 1440;
+    hh = String(Math.floor(totalMin/60)).padStart(2,'0');
+    min = String(totalMin%60).padStart(2,'0');
+    const yy = yyyy.slice(-2);
     return (hh === '00' && min === '00')
       ? `${dd}/${mm}/${yy}`
       : `${dd}/${mm}/${yy} ${hh}:${min}h`;
@@ -1525,7 +1532,7 @@
         telefono: (r[idx.telefono]||'').trim().replace(/\s+/g,''),
         email: (r[idx.email]||'').trim().toLowerCase(),
         fechaAsig: (r[idx.fechaAsig]||'').trim().split('T')[0],
-        fechaCita: (r[idx.fechaCita]||'').trim().replace('+00:00','').replace('Z','').trim()
+        fechaCita: (r[idx.fechaCita]||'').trim()
       })).filter(r => {
         if (!r.nombre) return false;
         if (fechaDesde && r.fechaAsig && r.fechaAsig < fechaDesde) return false;
