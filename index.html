@@ -834,6 +834,26 @@
   </div>
 </div>
 
+<!-- PROMPTS IA -->
+<div class="wa-section">
+  <div class="wa-toggle" onclick="togglePanel('ia')">
+    🤖 Prompts para la IA <span id="ia-arrow">▼</span>
+  </div>
+  <div class="wa-body" id="ia">
+    <div style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:6px;">
+      <button class="fchip" id="iaTab-nuevo" onclick="setIaTab('nuevo')">💬 Primer mensaje</button>
+      <button class="fchip" id="iaTab-sinrespuesta" onclick="setIaTab('sinrespuesta')">🔕 Sin respuesta</button>
+      <button class="fchip" id="iaTab-precio" onclick="setIaTab('precio')">💰 Precio</button>
+      <button class="fchip" id="iaTab-modalidad" onclick="setIaTab('modalidad')">🖥️ Online vs presencial</button>
+      <button class="fchip" id="iaTab-visita" onclick="setIaTab('visita')">🏫 Visita sin cerrar</button>
+      <button class="fchip" id="iaTab-requisitos" onclick="setIaTab('requisitos')">📋 Sin requisitos</button>
+      <button class="fchip" id="iaTab-queciclo" onclick="setIaTab('queciclo')">❓ Qué ciclo escoger</button>
+    </div>
+    <div class="wa-msg" id="iaMsgText" style="border-left-color:#8a6225;white-space:pre-wrap;"></div>
+    <button class="btn-copy" id="iaCopyBtn" onclick="copyIA()" style="background:#8a6225;">📋 Copiar prompt</button>
+  </div>
+</div>
+
 <!-- LISTA -->
 <div class="leads-list" id="leadsList">
   <div class="empty-state">
@@ -1114,11 +1134,11 @@
             ${l.email ? `<a href="mailto:${l.email}" class="contacto-link">✉️ ${l.email}</a>` : ''}
           </div>` : ''}
           ${(l.fecha || l.fechaCita) ? `<div class="lead-fechas">
-            ${l.fecha ? `<span class="fecha-item">📅 Últ. contacto: <strong>${formatFecha(l.fecha)}</strong></span>` : ''}
+            ${l.fecha ? `<span class="fecha-item" style="${daysSince(l.fecha) >= 3 ? 'color:var(--hot)' : 'color:var(--text2)'}">
+              ${daysSince(l.fecha) >= 3 ? '⚠️' : '📅'} Seguimiento: <strong>${formatFecha(l.fecha)}</strong></span>` : ''}
             ${l.fechaCita ? `<span class="fecha-item visita">🏫 Visita: <strong>${formatFechaConHora(l.fechaCita)}</strong></span>` : ''}
           </div>` : ''}
           <div class="lead-actions">
-            <button class="lead-action-btn contactar" onclick="markContacted('${l.id}')">✅ Contactado hoy</button>
             <button class="lead-action-btn" onclick="editLead('${l.id}')">✏️ Editar</button>
             <button class="lead-action-btn delete" onclick="deleteLead('${l.id}')">🗑️</button>
           </div>
@@ -1386,23 +1406,35 @@
     setWaVar(0);
   }
 
-  function copyWA() {
-    const text = document.getElementById('waMsgText').textContent;
-    const btn = document.getElementById('copyBtn');
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(text).then(() => {
-        btn.textContent = '✅ Copiado';
-        btn.classList.add('copied');
-        setTimeout(() => { btn.textContent = '📋 Copiar mensaje'; btn.classList.remove('copied'); }, 2000);
-      });
-    } else {
-      const ta = document.createElement('textarea');
-      ta.value = text; document.body.appendChild(ta);
-      ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+  function copyText(text, btn, label) {
+    const done = () => {
       btn.textContent = '✅ Copiado';
       btn.classList.add('copied');
-      setTimeout(() => { btn.textContent = '📋 Copiar mensaje'; btn.classList.remove('copied'); }, 2000);
+      setTimeout(() => { btn.textContent = label; btn.classList.remove('copied'); }, 2000);
+    };
+    // Método 1: clipboard API (funciona en https y algunos file://)
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+    } else {
+      fallbackCopy(text, done);
     }
+  }
+
+  function fallbackCopy(text, done) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try { document.execCommand('copy'); } catch(e) {}
+    document.body.removeChild(ta);
+    done();
+  }
+
+  function copyWA() {
+    const text = document.getElementById('waMsgText').textContent;
+    copyText(text, document.getElementById('copyBtn'), '📋 Copiar mensaje');
   }
 
   // ---- CSV IMPORT ----
@@ -1682,11 +1714,70 @@
     document.getElementById('visitasAlert').style.display = 'block';
   }
 
+  // ---- PROMPTS IA ----
+  const iaPrompts = {
+    nuevo: `Este lead me ha escrito por primera vez. Dame 2 opciones de respuesta para WhatsApp, cálidas y orientadas a concertar una llamada o visita. Sin sonar a call center.
+
+Mensaje del lead: [pega aquí el mensaje]
+Ciclo de interés: [ciclo]`,
+
+    sinrespuesta: `Este lead lleva [X] días sin responder. El último mensaje fue: [describe brevemente qué le dijiste].
+
+Dame 2 opciones de mensaje para reactivarlo sin presionar. Que abran conversación desde la curiosidad, no desde la venta.
+Ciclo de interés: [ciclo]`,
+
+    precio: `Este lead me está poniendo objeción de precio. Me ha dicho: [pega aquí lo que dijo].
+
+Dame 2 formas de responder que trabajen la objeción con empatía, pongan en valor el ciclo y mencionen opciones de pago si las hay. Tono humano, sin agobiar.
+Ciclo: [ciclo]`,
+
+    modalidad: `Este lead duda entre hacer el ciclo en modalidad online o presencial. Me ha dicho: [pega aquí lo que dijo].
+
+Dame 2 respuestas que le ayuden a decidir según su situación, destacando los puntos fuertes de cada opción. Tono cercano y sin presión.
+Ciclo: [ciclo]`,
+
+    visita: `Este lead vino a visitar el centro y le interesó el ciclo, pero lleva [X] días sin dar el paso final. El último contacto fue: [describe brevemente].
+
+Dame 2 mensajes para retomarlo con calidez, recordándole lo que vio y ayudándole a resolver lo que le frena.
+Ciclo: [ciclo]`,
+
+    requisitos: `Este lead quiere hacer el ciclo pero no cumple los requisitos de acceso. Me ha dicho: [describe su situación académica o formativa].
+
+Dame 2 respuestas que le expliquen la situación con honestidad, le ofrezcan alternativas si las hay (GESO, PFI, convalidaciones...) y no le cierren la puerta. Tono empático.
+Ciclo que quería: [ciclo]`,
+
+    queciclo: `Este lead no sabe qué ciclo escoger. Me ha contado esto sobre sus intereses o situación: [pega aquí lo que dijo].
+
+Ayúdame a orientarle con 2 respuestas: una que le haga preguntas para afinar más, y otra que le sugiera directamente 2 o 3 ciclos con una frase explicando por qué encajan con lo que busca.`
+  };
+
+  let iaTab = 'nuevo';
+
+  function setIaTab(tab) {
+    iaTab = tab;
+    document.getElementById('iaMsgText').textContent = iaPrompts[tab] || '';
+    document.querySelectorAll('[id^="iaTab-"]').forEach(b => b.classList.remove('active'));
+    const btn = document.getElementById('iaTab-' + tab);
+    if (btn) btn.classList.add('active');
+  }
+
+  function copyIA() {
+    const text = document.getElementById('iaMsgText').textContent;
+    copyText(text, document.getElementById('iaCopyBtn'), '📋 Copiar prompt');
+  }
+
+  function initIaPanel() { setIaTab('nuevo'); }
+
   // ---- INIT ----
   loadLeads();
   initDate();
   initWaPanel();
+  initIaPanel();
   initVisitasAlert();
+  // Por defecto mostrar solo Info enviada (leads activos)
+  filterFase = 'Info enviada';
+  document.querySelector('[data-group="fase"][data-val="Info enviada"]')?.classList.add('active');
+  document.querySelector('[data-group="fase"][data-val="all"]')?.classList.remove('active');
   renderLeads();
 </script>
 </body>
